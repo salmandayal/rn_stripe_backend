@@ -1,7 +1,7 @@
 import express from "express";
 import Stripe from "stripe";
 import "dotenv/config";
-
+const jwt = require("jsonwebtoken");
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Stripe secret key not found");
 }
@@ -57,7 +57,22 @@ app.listen(3000, () => {
   console.log("Stripe Server listening on port 3000");
 });
 
-//Get list of currencies for stripe payment
-function getStripeCurrencies() {
-  return stripe;
-}
+app.get("videosdk/get-token", (req, res) => {
+  //validation for api key and secret
+  if (!process.env.VIDEOSDK_API_KEY || !process.env.VIDEOSDK_API_SECRET) {
+    return res.status(500).send("VideoSDK API key or secret not found");
+  }
+  const options = {
+    expiresIn: "10m",
+    algorithm: "HS256",
+  };
+  const payload = {
+    apikey: process.env.VIDEOSDK_API_KEY,
+    permissions: [`allow_join`], // `ask_join` || `allow_mod`
+    version: 2,
+    roles: ["CRAWLER"],
+  };
+
+  const token = jwt.sign(payload, process.env.VIDEOSDK_API_SECRET, options);
+  return res.status(200).send({ videoSdkToken: token });
+});
