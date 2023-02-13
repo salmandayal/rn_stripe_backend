@@ -14,15 +14,39 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const app = express();
 app.use(express.json());
 
+app.post("/create-customer", async (req, res) => {
+  const customer = await stripe.customers.create({
+    email: req.body.email,
+  });
+  res.send({ customerId: customer.id });
+});
+
 app.post("/create-payment-intent", async (req, res) => {
-  const { amount } = req.body;
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount,
-    currency: "aed",
-  });
-  res.send({
-    clientSecret: paymentIntent.client_secret,
-  });
+  try {
+    const { amount } = req.body;
+    //What shall we do to store customer Id in our database?
+
+    // Use an existing Customer ID if this is a returning customer.
+    const customer = await stripe.customers.create();
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: customer.id },
+      { apiVersion: "2022-11-15" }
+    );
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100, //Amount in cents
+      currency: "aed",
+      payment_method_types: ["card"],
+    });
+    res.send({
+      paymentIntent: paymentIntent.client_secret,
+      ephemeralKey: ephemeralKey.secret,
+      customer: customer.id,
+    });
+  } catch (error: any) {
+    //Handle error response
+    console.log("Error while creating payment intent", error?.message);
+    res.status(500).send("Error in creating payment intent");
+  }
 });
 
 app.get("/", (req, res) => {
